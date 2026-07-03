@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Patch module for NetconfMessageTransformer to fix MountPointContext/DatabindContext
+  usage for base RPCs in lighty-based SDNR.
+  
+  This module provides a fixed version of NetconfMessageTransformer that uses the
+  correct DatabindContext when parsing base RPC responses (get-config, lock, etc.).
+  
+  The fix ensures that when handling base netconf RPCs, the baseSchema's databind
+  is used instead of the device's databind, preventing schema context mismatches.
+  
+  Based on: org.opendaylight.netconf:netconf-client-mdsal:10.0.2
+  Issue: toRpcResult() uses device databind for base RPCs instead of baseSchema databind
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.lighty.core</groupId>
+        <artifactId>lighty-parent</artifactId>
+        <version>23.0.0</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>org.iosmcn.lighty.sdnr</groupId>
+    <artifactId>netconf-transformer-patch</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    
+    <name>NETCONF Transformer Patch for Lighty SDNR</name>
+    <description>
+        Patched NetconfMessageTransformer that fixes DatabindContext usage for base RPCs.
+        This class overrides the one in netconf-client-mdsal to fix schema context mismatches.
+    </description>
+
+    <dependencies>
+        <!-- Compile against netconf-client-mdsal to get all required types -->
+        <dependency>
+            <groupId>org.opendaylight.netconf</groupId>
+            <artifactId>netconf-client-mdsal</artifactId>
+            <version>10.0.2</version>
+            <scope>provided</scope>
+        </dependency>
+        
+        <!-- Required transitive dependencies for compilation -->
+        <dependency>
+            <groupId>org.opendaylight.yangtools</groupId>
+            <artifactId>yang-data-codec-xml</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.opendaylight.yangtools</groupId>
+            <artifactId>yang-data-impl</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.opendaylight.mdsal</groupId>
+            <artifactId>mdsal-dom-spi</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.checkerframework</groupId>
+            <artifactId>checker-qual</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.opendaylight.yangtools</groupId>
+                <artifactId>yangtools-artifacts</artifactId>
+                <version>14.0.20</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.opendaylight.mdsal</groupId>
+                <artifactId>mdsal-artifacts</artifactId>
+                <version>15.0.4</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <release>21</release>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

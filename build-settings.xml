@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Maven settings for building Lighty SDNR with IETF NETCONF 2013 revision.
+  
+  USAGE:
+    mvn clean install -s build-settings.xml -DskipTests
+  
+  Or copy to ~/.m2/settings.xml for global use.
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+
+    <profiles>
+        <!-- OpenDaylight repositories (required for yangtools, mdsal, netconf) -->
+        <profile>
+            <id>opendaylight-repos</id>
+            <repositories>
+                <repository>
+                    <id>opendaylight-mirror</id>
+                    <name>OpenDaylight Mirror</name>
+                    <url>https://nexus.opendaylight.org/content/repositories/public/</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>true</enabled></snapshots>
+                </repository>
+                <repository>
+                    <id>opendaylight-snapshots</id>
+                    <name>OpenDaylight Snapshots</name>
+                    <url>https://nexus.opendaylight.org/content/repositories/opendaylight.snapshot/</url>
+                    <releases><enabled>false</enabled></releases>
+                    <snapshots><enabled>true</enabled></snapshots>
+                </repository>
+                <repository>
+                    <id>opendaylight-releases</id>
+                    <name>OpenDaylight Releases</name>
+                    <url>https://nexus.opendaylight.org/content/repositories/opendaylight.release/</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </repository>
+            </repositories>
+            <pluginRepositories>
+                <pluginRepository>
+                    <id>opendaylight-mirror</id>
+                    <name>OpenDaylight Mirror</name>
+                    <url>https://nexus.opendaylight.org/content/repositories/public/</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>true</enabled></snapshots>
+                </pluginRepository>
+            </pluginRepositories>
+        </profile>
+
+        <!-- ONAP repositories -->
+        <profile>
+            <id>onap-repos</id>
+            <repositories>
+                <repository>
+                    <id>onap-public</id>
+                    <name>ONAP Public</name>
+                    <url>https://nexus.onap.org/content/repositories/public/</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </repository>
+                <repository>
+                    <id>onap-releases</id>
+                    <name>ONAP Releases</name>
+                    <url>https://nexus.onap.org/content/repositories/releases/</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </repository>
+                <repository>
+                    <id>onap-snapshots</id>
+                    <name>ONAP Snapshots</name>
+                    <url>https://nexus.onap.org/content/repositories/snapshots/</url>
+                    <releases><enabled>false</enabled></releases>
+                    <snapshots><enabled>true</enabled></snapshots>
+                </repository>
+            </repositories>
+            <pluginRepositories>
+                <pluginRepository>
+                    <id>onap-public</id>
+                    <name>ONAP Public</name>
+                    <url>https://nexus.onap.org/content/repositories/public/</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </pluginRepository>
+            </pluginRepositories>
+        </profile>
+
+        <!-- Lighty.io / PANTHEON.tech repositories -->
+        <profile>
+            <id>lighty-repos</id>
+            <repositories>
+                <repository>
+                    <id>lighty-releases</id>
+                    <name>Lighty Releases</name>
+                    <url>https://nexus.lightypro.io/repository/maven-releases/</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </repository>
+            </repositories>
+        </profile>
+
+        <!-- Maven Central -->
+        <profile>
+            <id>central</id>
+            <repositories>
+                <repository>
+                    <id>central</id>
+                    <name>Maven Central</name>
+                    <url>https://repo1.maven.org/maven2/</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </repository>
+            </repositories>
+            <pluginRepositories>
+                <pluginRepository>
+                    <id>central</id>
+                    <name>Maven Central</name>
+                    <url>https://repo1.maven.org/maven2/</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </pluginRepository>
+            </pluginRepositories>
+        </profile>
+    </profiles>
+
+    <activeProfiles>
+        <activeProfile>central</activeProfile>
+        <activeProfile>opendaylight-repos</activeProfile>
+        <activeProfile>onap-repos</activeProfile>
+        <activeProfile>lighty-repos</activeProfile>
+    </activeProfiles>
+
+</settings>
