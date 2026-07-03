@@ -1,0 +1,222 @@
+# GitHub Actions workflow for building Lighty SDNR and publishing Docker image
+# This builds the lightweight SDNR application with O-RAN NETCONF support
+# and publishes the Docker image to GitHub Container Registry (ghcr.io)
+
+name: Build and Publish Lighty SDNR
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  JAVA_VERSION: '21'
+  MAVEN_OPTS: '-Xmx2g'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: sknrao/lighty-sdnr
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Configure Maven for GitHub Packages
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml << 'EOF'
+          <settings>
+            <servers>
+              <server>
+                <id>github-netconf</id>
+                <username>${{ github.actor }}</username>
+                <password>${{ secrets.GITHUB_TOKEN }}</password>
+              </server>
+            </servers>
+            <profiles>
+              <profile>
+                <id>github</id>
+                <repositories>
+                  <repository>
+                    <id>github-netconf</id>
+                    <url>https://maven.pkg.github.com/sknrao/netconf</url>
+                    <snapshots>
+                      <enabled>true</enabled>
+                    </snapshots>
+                  </repository>
+                  <repository>
+                    <id>opendaylight-snapshots</id>
+                    <url>https://nexus.opendaylight.org/content/repositories/opendaylight.snapshot/</url>
+                    <snapshots>
+                      <enabled>true</enabled>
+                    </snapshots>
+                  </repository>
+                  <repository>
+                    <id>opendaylight-releases</id>
+                    <url>https://nexus.opendaylight.org/content/repositories/public/</url>
+                  </repository>
+                </repositories>
+              </profile>
+            </profiles>
+            <activeProfiles>
+              <activeProfile>github</activeProfile>
+            </activeProfiles>
+          </settings>
+          EOF
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="0.0.1-SNAPSHOT"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Build Lighty modules
+        run: |
+          mvn clean install -DskipTests -f modules/pom.xml
+
+      - name: Build Lighty SDNR application
+        run: |
+          mvn clean install -DskipTests -f applications/pom.xml
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighty-sdnr-app
+          path: applications/lighty-sdnr-lite/lighty-sdnr-lite-app/target/*.jar
+          retention-days: 7
+
+  docker:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Configure Maven for GitHub Packages
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml << 'EOF'
+          <settings>
+            <servers>
+              <server>
+                <id>github-netconf</id>
+                <username>${{ github.actor }}</username>
+                <password>${{ secrets.GITHUB_TOKEN }}</password>
+              </server>
+            </servers>
+            <profiles>
+              <profile>
+                <id>github</id>
+                <repositories>
+                  <repository>
+                    <id>github-netconf</id>
+                    <url>https://maven.pkg.github.com/sknrao/netconf</url>
+                    <snapshots>
+                      <enabled>true</enabled>
+                    </snapshots>
+                  </repository>
+                  <repository>
+                    <id>opendaylight-snapshots</id>
+                    <url>https://nexus.opendaylight.org/content/repositories/opendaylight.snapshot/</url>
+                    <snapshots>
+                      <enabled>true</enabled>
+                    </snapshots>
+                  </repository>
+                  <repository>
+                    <id>opendaylight-releases</id>
+                    <url>https://nexus.opendaylight.org/content/repositories/public/</url>
+                  </repository>
+                </repositories>
+              </profile>
+            </profiles>
+            <activeProfiles>
+              <activeProfile>github</activeProfile>
+            </activeProfiles>
+          </settings>
+          EOF
+
+      - name: Build application and Docker image with Maven
+        run: |
+          # Build modules
+          mvn clean install -DskipTests -f modules/pom.xml
+          
+          # Build app and Docker image
+          mvn clean package -DskipTests -f applications/pom.xml
+          
+          # Build Docker image with Maven docker plugin
+          cd applications/lighty-sdnr-lite/lighty-sdnr-lite-docker
+          mvn package docker:build -DskipTests
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and push Docker image
+        run: |
+          # Get the local image name
+          LOCAL_IMAGE="iosmcn-sdnrlite:latest"
+          
+          # Determine tags
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+            TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          elif [[ "${{ github.ref }}" == refs/heads/main ]] || [[ "${{ github.ref }}" == refs/heads/master ]]; then
+            TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          else
+            BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
+            TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${BRANCH_NAME}"
+          fi
+          
+          # Tag and push
+          for TAG in $TAGS; do
+            echo "Tagging and pushing: $TAG"
+            docker tag $LOCAL_IMAGE $TAG
+            docker push $TAG
+          done
+
+      - name: Image info
+        run: |
+          echo "Docker image pushed to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          docker images | grep -E "iosmcn-sdnrlite|${{ env.IMAGE_NAME }}"
