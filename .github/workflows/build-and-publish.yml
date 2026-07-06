@@ -1,7 +1,11 @@
 # GitHub Actions workflow for building Lighty SDNR and publishing Docker image
 # This builds the lightweight SDNR application with O-RAN NETCONF support
+#
+# The project is SELF-CONTAINED - no external netconf repo needed.
+# O-RAN support modules (oran-netconf-model, netconf-transformer-patch) compile
+# against Lighty's bundled dependencies (netconf 10.0.2 from ODL Vanadium).
 
-name: Build and Publish Lighty SDNR
+name: Build and Publish Lighty SDNR (O-RAN)
 
 on:
   push:
@@ -10,23 +14,12 @@ on:
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
-    inputs:
-      use_published_netconf:
-        description: 'Use published netconf packages (true) or build from source (false)'
-        required: false
-        default: 'false'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
 
 env:
   JAVA_VERSION: '21'
   MAVEN_OPTS: '-Xmx4g'
   REGISTRY: ghcr.io
   IMAGE_NAME: sknrao/lighty-sdnr
-  NETCONF_REPO: sknrao/netconf
-  NETCONF_BRANCH: main
 
 jobs:
   build:
@@ -37,10 +30,8 @@ jobs:
       packages: write
     
     steps:
-      - name: Checkout lighty-sdnr repository
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          path: lighty-sdnr
 
       - name: Set up JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
@@ -49,29 +40,15 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Configure Maven settings
+      - name: Configure Maven settings for ODL repositories
         run: |
           mkdir -p ~/.m2
           cat > ~/.m2/settings.xml << 'EOF'
           <settings>
-            <servers>
-              <server>
-                <id>github-netconf</id>
-                <username>${{ github.actor }}</username>
-                <password>${{ secrets.GITHUB_TOKEN }}</password>
-              </server>
-            </servers>
             <profiles>
               <profile>
-                <id>github</id>
+                <id>odl</id>
                 <repositories>
-                  <repository>
-                    <id>github-netconf</id>
-                    <url>https://maven.pkg.github.com/sknrao/netconf</url>
-                    <snapshots>
-                      <enabled>true</enabled>
-                    </snapshots>
-                  </repository>
                   <repository>
                     <id>opendaylight-snapshots</id>
                     <url>https://nexus.opendaylight.org/content/repositories/opendaylight.snapshot/</url>
@@ -87,80 +64,22 @@ jobs:
               </profile>
             </profiles>
             <activeProfiles>
-              <activeProfile>github</activeProfile>
+              <activeProfile>odl</activeProfile>
             </activeProfiles>
           </settings>
           EOF
 
-      # Option 1: Build netconf from source (default - more reliable)
-      - name: Checkout netconf repository
-        if: inputs.use_published_netconf != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.NETCONF_REPO }}
-          ref: ${{ env.NETCONF_BRANCH }}
-          path: netconf
-
-      - name: Build netconf from source
-        if: inputs.use_published_netconf != 'true'
+      - name: Build Lighty SDNR (self-contained, includes O-RAN modules)
         run: |
-          cd netconf
-          echo "Building NETCONF 10.0.x with O-RAN fixes..."
-          
-          # Build only required modules (skip transport-udp which has dependency issues)
-          mvn clean install -DskipTests -N  # Root pom only
-          mvn clean install -DskipTests -pl artifacts,bnd-parent,parent -am
-          
-          # Protocol modules
-          mvn clean install -DskipTests -pl protocol/databind -am
-          mvn clean install -DskipTests -pl protocol/netconf-api -am
-          mvn clean install -DskipTests -pl protocol/netconf-common -am
-          mvn clean install -DskipTests -pl protocol/netconf-codec -am
-          mvn clean install -DskipTests -pl protocol/netconf-client -am
-          
-          # Model modules
-          mvn clean install -DskipTests -pl model/rfc5277 -am
-          mvn clean install -DskipTests -pl model/rfc6241 -am
-          
-          # Plugin modules
-          mvn clean install -DskipTests -pl plugins/netconf-common-mdsal -am
-          mvn clean install -DskipTests -pl plugins/netconf-dom-api -am
-          mvn clean install -DskipTests -pl plugins/netconf-client-mdsal -am
-          
-          # Keystore
-          mvn clean install -DskipTests -pl keystore/keystore-api -am
-          mvn clean install -DskipTests -pl keystore/keystore-legacy -am || true
-          
-          # Transport (skip udp)
-          mvn clean install -DskipTests -pl transport/transport-api -am
-          mvn clean install -DskipTests -pl transport/transport-tcp -am || true
-          mvn clean install -DskipTests -pl transport/transport-ssh -am || true
-          mvn clean install -DskipTests -pl transport/transport-tls -am || true
-          
-          echo "NETCONF build complete"
-
-      # Option 2: Use published packages (if selected)
-      - name: Verify published netconf packages
-        if: inputs.use_published_netconf == 'true'
-        run: |
-          echo "Using published netconf packages from GitHub Packages"
-          echo "Make sure netconf workflow has run and published packages first!"
-
-      - name: Build Lighty modules
-        run: |
-          cd lighty-sdnr
-          mvn clean install -DskipTests -f modules/pom.xml
-
-      - name: Build Lighty SDNR application
-        run: |
-          cd lighty-sdnr
-          mvn clean install -DskipTests -f applications/pom.xml
+          echo "Building Lighty SDNR with O-RAN NETCONF support..."
+          echo "No external netconf repo needed - everything is self-contained!"
+          mvn clean install -DskipTests
 
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: lighty-sdnr-app
-          path: lighty-sdnr/applications/lighty-sdnr-lite/lighty-sdnr-lite-app/target/*.jar
+          path: applications/lighty-sdnr-lite/lighty-sdnr-lite-app/target/*.jar
           retention-days: 30
 
   docker:
@@ -173,10 +92,8 @@ jobs:
       packages: write
     
     steps:
-      - name: Checkout lighty-sdnr repository
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          path: lighty-sdnr
 
       - name: Set up JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
@@ -185,29 +102,15 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Configure Maven settings
+      - name: Configure Maven settings for ODL repositories
         run: |
           mkdir -p ~/.m2
           cat > ~/.m2/settings.xml << 'EOF'
           <settings>
-            <servers>
-              <server>
-                <id>github-netconf</id>
-                <username>${{ github.actor }}</username>
-                <password>${{ secrets.GITHUB_TOKEN }}</password>
-              </server>
-            </servers>
             <profiles>
               <profile>
-                <id>github</id>
+                <id>odl</id>
                 <repositories>
-                  <repository>
-                    <id>github-netconf</id>
-                    <url>https://maven.pkg.github.com/sknrao/netconf</url>
-                    <snapshots>
-                      <enabled>true</enabled>
-                    </snapshots>
-                  </repository>
                   <repository>
                     <id>opendaylight-snapshots</id>
                     <url>https://nexus.opendaylight.org/content/repositories/opendaylight.snapshot/</url>
@@ -223,53 +126,15 @@ jobs:
               </profile>
             </profiles>
             <activeProfiles>
-              <activeProfile>github</activeProfile>
+              <activeProfile>odl</activeProfile>
             </activeProfiles>
           </settings>
           EOF
 
-      # Build netconf from source
-      - name: Checkout netconf repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.NETCONF_REPO }}
-          ref: ${{ env.NETCONF_BRANCH }}
-          path: netconf
-
-      - name: Build netconf from source
-        run: |
-          cd netconf
-          echo "Building NETCONF 10.0.x with O-RAN fixes..."
-          
-          # Build only required modules (skip transport-udp which has dependency issues)
-          mvn clean install -DskipTests -N
-          mvn clean install -DskipTests -pl artifacts,bnd-parent,parent -am
-          mvn clean install -DskipTests -pl protocol/databind -am
-          mvn clean install -DskipTests -pl protocol/netconf-api -am
-          mvn clean install -DskipTests -pl protocol/netconf-common -am
-          mvn clean install -DskipTests -pl protocol/netconf-codec -am
-          mvn clean install -DskipTests -pl protocol/netconf-client -am
-          mvn clean install -DskipTests -pl model/rfc5277 -am
-          mvn clean install -DskipTests -pl model/rfc6241 -am
-          mvn clean install -DskipTests -pl plugins/netconf-common-mdsal -am
-          mvn clean install -DskipTests -pl plugins/netconf-dom-api -am
-          mvn clean install -DskipTests -pl plugins/netconf-client-mdsal -am
-          mvn clean install -DskipTests -pl keystore/keystore-api -am
-          mvn clean install -DskipTests -pl keystore/keystore-legacy -am || true
-          mvn clean install -DskipTests -pl transport/transport-api -am
-          mvn clean install -DskipTests -pl transport/transport-tcp -am || true
-          mvn clean install -DskipTests -pl transport/transport-ssh -am || true
-          mvn clean install -DskipTests -pl transport/transport-tls -am || true
-
       - name: Build application and Docker image
         run: |
-          cd lighty-sdnr
-          
-          # Build modules
-          mvn clean install -DskipTests -f modules/pom.xml
-          
-          # Build app
-          mvn clean install -DskipTests -f applications/pom.xml
+          # Build everything
+          mvn clean install -DskipTests
           
           # Build Docker image
           cd applications/lighty-sdnr-lite/lighty-sdnr-lite-docker
@@ -312,6 +177,11 @@ jobs:
           echo "## Docker Image Published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Image: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### O-RAN NETCONF Support" >> $GITHUB_STEP_SUMMARY
+          echo "- IETF NETCONF 2013-09-29 revision (with NACM)" >> $GITHUB_STEP_SUMMARY
+          echo "- NetconfMessageTransformer fix for base RPC parsing" >> $GITHUB_STEP_SUMMARY
+          echo "- Self-contained (no external netconf repo)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "To pull:" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY

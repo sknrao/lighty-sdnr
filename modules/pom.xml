@@ -20,7 +20,8 @@
     </properties>
 
     <modules>
-        <!-- netconf-transformer-patch removed - fix is now in netconf-10.0.x -->
+        <module>oran-netconf-model</module>
+        <module>netconf-transformer-patch</module>
         <module>iosmcn-pnf-registration</module>
         <module>yang-schema</module>
         <module>iosmcn-data-provider</module>

@@ -19,58 +19,36 @@
                 <application.main.class>org.iosmcn.lighty.sdnr.lite.app.Main</application.main.class>
                 <application.attach.zip>true</application.attach.zip>
                 <maven.deploy.skip>true</maven.deploy.skip>
-                <!-- O-RAN NETCONF 2013 revision support from netconf-10.0.x -->
-                <netconf.oran.version>10.0.4-SNAPSHOT</netconf.oran.version>
         </properties>
 
         <dependencies>
                 <!-- 
-                     O-RAN NETCONF Support (from netconf-10.0.x with fixes):
-                     1. rfc6241 model with ietf-netconf@2013-09-29 revision
-                     2. netconf-client-mdsal with transformer fix for base RPC parsing
+                     O-RAN NETCONF 2013 Support (SELF-CONTAINED - no external netconf repo needed):
+                     1. oran-netconf-model: YANG model with ietf-netconf@2013-09-29 revision
+                     2. netconf-transformer-patch: Fix for base RPC parsing
+                     Both modules compile against Lighty's bundled dependencies.
                 -->
                 
-                <!-- Custom rfc6241 with 2013-09-29 revision for O-RAN compatibility -->
+                <!-- O-RAN NETCONF model with 2013 revision (self-contained) -->
                 <dependency>
-                        <groupId>org.opendaylight.netconf.model</groupId>
-                        <artifactId>rfc6241</artifactId>
-                        <version>${netconf.oran.version}</version>
-                        <exclusions>
-                                <exclusion>
-                                        <groupId>org.opendaylight.ietf.model</groupId>
-                                        <artifactId>rfc6241</artifactId>
-                                </exclusion>
-                        </exclusions>
+                        <groupId>org.iosmcn.lighty.sdnr</groupId>
+                        <artifactId>oran-netconf-model</artifactId>
+                        <version>0.0.1-SNAPSHOT</version>
                 </dependency>
                 
-                <!-- Keep ietf.model:rfc6241 for rev110601 classes needed by netconf-node-topology -->
+                <!-- IMPORTANT: netconf-transformer-patch MUST come BEFORE lighty-netconf-sb
+                     to ensure the patched NetconfMessageTransformer class takes precedence -->
                 <dependency>
-                        <groupId>org.opendaylight.ietf.model</groupId>
-                        <artifactId>rfc6241</artifactId>
+                        <groupId>org.iosmcn.lighty.sdnr</groupId>
+                        <artifactId>netconf-transformer-patch</artifactId>
+                        <version>0.0.1-SNAPSHOT</version>
                 </dependency>
                 
-                <!-- Patched netconf-client-mdsal with transformer fix - MUST come BEFORE lighty-netconf-sb -->
-                <dependency>
-                        <groupId>org.opendaylight.netconf</groupId>
-                        <artifactId>netconf-client-mdsal</artifactId>
-                        <version>${netconf.oran.version}</version>
-                </dependency>
-                
+                <!-- Lighty modules (unchanged - use their bundled netconf 10.0.2) -->
                 <dependency>
                         <groupId>io.lighty.modules</groupId>
                         <artifactId>lighty-netconf-sb</artifactId>
                         <version>23.0.0</version>
-                        <exclusions>
-                                <exclusion>
-                                        <groupId>org.opendaylight.ietf.model</groupId>
-                                        <artifactId>rfc6241</artifactId>
-                                </exclusion>
-                                <!-- Exclude Lighty's netconf-client-mdsal, we use our patched version -->
-                                <exclusion>
-                                        <groupId>org.opendaylight.netconf</groupId>
-                                        <artifactId>netconf-client-mdsal</artifactId>
-                                </exclusion>
-                        </exclusions>
                 </dependency>
                 <dependency>
                         <groupId>io.lighty.modules</groupId>

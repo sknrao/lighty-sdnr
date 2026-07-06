@@ -1,11 +1,14 @@
 #!/bin/bash
 # Build script for Lighty SDNR application
 #
+# This project is SELF-CONTAINED - no external netconf repo needed!
+# O-RAN NETCONF support is built-in via:
+#   - oran-netconf-model: YANG model with 2013-09-29 revision
+#   - netconf-transformer-patch: Fix for base RPC parsing
+#
 # Prerequisites:
 #   - JDK 17 or 21
 #   - Maven 3.8+
-#   - NETCONF 10.0.x artifacts (10.0.4-SNAPSHOT) already in Maven repo
-#     Built from: netconf-10.0.x/ (contains O-RAN NETCONF 2013 fixes)
 #
 # Usage:
 #   ./build-app.sh              # Build app only
@@ -44,9 +47,8 @@ for arg in "$@"; do
             echo "  --clean    Clean build (remove target directories)"
             echo "  --help     Show this help message"
             echo ""
-            echo "Note: Requires NETCONF 10.0.x artifacts (10.0.4-SNAPSHOT) to be"
-            echo "      already installed in your local Maven repository."
-            echo "      Build with: cd ../netconf-10.0.x && mvn install -DskipTests -pl artifacts,bnd-parent,parent,model/rfc6241,plugins/netconf-client-mdsal -am"
+            echo "This project is SELF-CONTAINED - no external netconf repo needed!"
+            echo "O-RAN NETCONF support is built-in."
             exit 0
             ;;
     esac
@@ -54,6 +56,7 @@ done
 
 echo -e "${CYAN}========================================${NC}"
 echo -e "${CYAN}  Lighty SDNR App Build Script${NC}"
+echo -e "${CYAN}  (Self-contained O-RAN NETCONF)${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 
@@ -64,13 +67,15 @@ if ! command -v java &> /dev/null; then
     echo -e "${RED}  ERROR: Java not found. Please install JDK 17 or 21.${NC}"
     exit 1
 fi
-echo -e "${GREEN}  Java: OK${NC}"
+JAVA_VERSION=$(java -version 2>&1 | head -n 1)
+echo -e "${GREEN}  Java: OK ($JAVA_VERSION)${NC}"
 
 if ! command -v mvn &> /dev/null; then
     echo -e "${RED}  ERROR: Maven not found. Please install Maven 3.8+.${NC}"
     exit 1
 fi
-echo -e "${GREEN}  Maven: OK${NC}"
+MVN_VERSION=$(mvn -version 2>&1 | head -n 1)
+echo -e "${GREEN}  Maven: OK ($MVN_VERSION)${NC}"
 
 # Check if settings file exists, use default if not
 if [ -f "$SETTINGS_FILE" ]; then
@@ -79,18 +84,6 @@ if [ -f "$SETTINGS_FILE" ]; then
 else
     echo -e "${YELLOW}  Settings: Using default Maven settings${NC}"
     SETTINGS_OPT=""
-fi
-
-# Check if netconf 10.0.x artifacts are available
-RFC6241_PATH=~/.m2/repository/org/opendaylight/netconf/model/rfc6241/10.0.4-SNAPSHOT
-TRANSFORMER_PATH=~/.m2/repository/org/opendaylight/netconf/netconf-client-mdsal/10.0.4-SNAPSHOT
-ARTIFACTS_PATH=~/.m2/repository/org/opendaylight/netconf/netconf-artifacts/10.0.4-SNAPSHOT
-if [ -d "$RFC6241_PATH" ] && [ -d "$TRANSFORMER_PATH" ] && [ -d "$ARTIFACTS_PATH" ]; then
-    echo -e "${GREEN}  NETCONF 10.0.x artifacts: Found in Maven repo${NC}"
-else
-    echo -e "${RED}  WARNING: NETCONF 10.0.x artifacts not found in Maven repo${NC}"
-    echo -e "${RED}           Build may fail. Build netconf-10.0.x first:${NC}"
-    echo -e "${RED}           cd ../netconf-10.0.x && mvn install -DskipTests -pl artifacts,bnd-parent,parent,model/rfc6241,plugins/netconf-client-mdsal -am${NC}"
 fi
 echo ""
 
@@ -107,7 +100,7 @@ echo -e "${YELLOW}[2/4] Building Lighty modules...${NC}"
 
 cd "$SCRIPT_DIR"
 
-echo -e "  Building custom modules (pnf-registration, yang-schema, data-provider)..."
+echo -e "  Building modules (oran-netconf-model, netconf-transformer-patch, etc.)..."
 mvn $MVN_CLEAN install -f modules/pom.xml $SETTINGS_OPT $MVN_OPTS
 echo -e "${GREEN}    Modules OK${NC}"
 echo ""
@@ -141,8 +134,12 @@ echo ""
 echo "Artifacts:"
 echo "  - Lighty app JAR: applications/lighty-sdnr-lite/lighty-sdnr-lite-app/target/lighty-sdnr-lite-app-0.0.1-SNAPSHOT.jar"
 if [ "$BUILD_DOCKER" = true ]; then
-    echo "  - Docker image: Check 'docker images'"
+    echo "  - Docker image: iosmcn-sdnrlite:latest"
 fi
+echo ""
+echo "O-RAN NETCONF Support (self-contained):"
+echo "  - IETF NETCONF 2013-09-29 revision with NACM"
+echo "  - NetconfMessageTransformer fix for base RPC parsing"
 echo ""
 echo "To run:"
 echo "  java -jar applications/lighty-sdnr-lite/lighty-sdnr-lite-app/target/lighty-sdnr-lite-app-0.0.1-SNAPSHOT.jar"
