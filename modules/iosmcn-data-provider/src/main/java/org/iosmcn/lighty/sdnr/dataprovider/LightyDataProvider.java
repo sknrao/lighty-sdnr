@@ -1,10 +1,8 @@
 /*
  * LightyDataProvider.java
  *
- * AbstractLightyModule that registers the darpan-facing data-provider RPCs
- * into MD-SAL's RPC service. Uses a Live NETCONF backend that reads
- * network element connections from the NETCONF topology in the operational
- * datastore, and implements create/update/delete by modifying the config datastore.
+ * AbstractLightyModule that registers the data-provider RPCs into MD-SAL's RPC service.
+ * Reads network element data from the NETCONF topology in the operational datastore.
  */
 package org.iosmcn.lighty.sdnr.dataprovider;
 
@@ -16,7 +14,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.eclipse.jdt.annotation.NonNull;
-import org.opendaylight.mdsal.binding.api.DataBroker;
 import org.opendaylight.mdsal.binding.api.ReadTransaction;
 import org.opendaylight.mdsal.binding.api.RpcProviderService;
 import org.opendaylight.mdsal.binding.api.WriteTransaction;
@@ -36,7 +33,6 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.pro
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.provider.rev201110.status.entity.FaultsBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.provider.rev201110.status.entity.NetworkElementConnectionsBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.provider.rev201110.read.status.output.DataBuilder;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.provider.rev201110.read.network.element.connection.list.output.PaginationBuilder;
 import org.opendaylight.yang.gen.v1.urn.tbd.params.xml.ns.yang.network.topology.rev131021.NetworkTopology;
 import org.opendaylight.yang.gen.v1.urn.tbd.params.xml.ns.yang.network.topology.rev131021.NodeId;
 import org.opendaylight.yang.gen.v1.urn.tbd.params.xml.ns.yang.network.topology.rev131021.TopologyId;
@@ -83,30 +79,31 @@ public class LightyDataProvider extends AbstractLightyModule {
             LOG.info("Registering data-provider RPCs …");
             this.rpcRegistration = rpcProviderService.registerRpcImplementations(
                 List.of(
+                    // Live RPCs - read from NETCONF topology
                     new RpcHelper<>(ReadStatus.class, this::readStatus),
                     new RpcHelper<>(ReadNetworkElementConnectionList.class, this::readNetworkElementConnectionList),
+                    new RpcHelper<>(ReadInventoryList.class, this::readInventoryList),
                     new RpcHelper<>(CreateNetworkElementConnection.class, this::createNetworkElementConnection),
                     new RpcHelper<>(UpdateNetworkElementConnection.class, this::updateNetworkElementConnection),
                     new RpcHelper<>(DeleteNetworkElementConnection.class, this::deleteNetworkElementConnection),
                     
-                    // Stubs for remaining to prevent 500 errors
-                    new RpcHelper<>(ReadFaultcurrentList.class, input -> stubList(new ReadFaultcurrentListOutputBuilder().build())),
-                    new RpcHelper<>(ReadInventoryList.class, input -> stubList(new ReadInventoryListOutputBuilder().build())),
-                    new RpcHelper<>(ReadInventoryDeviceList.class, input -> stubList(new ReadInventoryDeviceListOutputBuilder().build())),
-                    new RpcHelper<>(ReadFaultlogList.class, input -> stubList(new ReadFaultlogListOutputBuilder().build())),
-                    new RpcHelper<>(ReadCmlogList.class, input -> stubList(new ReadCmlogListOutputBuilder().build())),
-                    new RpcHelper<>(ReadEventlogList.class, input -> stubList(new ReadEventlogListOutputBuilder().build())),
-                    new RpcHelper<>(ReadConnectionlogList.class, input -> stubList(new ReadConnectionlogListOutputBuilder().build())),
-                    new RpcHelper<>(ReadMaintenanceList.class, input -> stubList(new ReadMaintenanceListOutputBuilder().build())),
-                    new RpcHelper<>(ReadMediatorServerList.class, input -> stubList(new ReadMediatorServerListOutputBuilder().build())),
-                    new RpcHelper<>(ReadPmdata15mList.class, input -> stubList(new ReadPmdata15mListOutputBuilder().build())),
-                    new RpcHelper<>(ReadPmdata15mLtpList.class, input -> stubList(new ReadPmdata15mLtpListOutputBuilder().build())),
-                    new RpcHelper<>(ReadPmdata15mDeviceList.class, input -> stubList(new ReadPmdata15mDeviceListOutputBuilder().build())),
-                    new RpcHelper<>(ReadPmdata24hList.class, input -> stubList(new ReadPmdata24hListOutputBuilder().build())),
-                    new RpcHelper<>(ReadPmdata24hLtpList.class, input -> stubList(new ReadPmdata24hLtpListOutputBuilder().build())),
-                    new RpcHelper<>(ReadPmdata24hDeviceList.class, input -> stubList(new ReadPmdata24hDeviceListOutputBuilder().build())),
-                    new RpcHelper<>(ReadGuiCutThroughEntry.class, input -> stubList(new ReadGuiCutThroughEntryOutputBuilder().build())),
-                    new RpcHelper<>(ReadTlsKeyEntry.class, input -> stubList(new ReadTlsKeyEntryOutputBuilder().build()))
+                    // Stub RPCs - return empty but valid responses
+                    new RpcHelper<>(ReadFaultcurrentList.class, this::readFaultcurrentList),
+                    new RpcHelper<>(ReadInventoryDeviceList.class, i -> stub(new ReadInventoryDeviceListOutputBuilder().build())),
+                    new RpcHelper<>(ReadFaultlogList.class, i -> stub(new ReadFaultlogListOutputBuilder().build())),
+                    new RpcHelper<>(ReadCmlogList.class, i -> stub(new ReadCmlogListOutputBuilder().build())),
+                    new RpcHelper<>(ReadEventlogList.class, i -> stub(new ReadEventlogListOutputBuilder().build())),
+                    new RpcHelper<>(ReadConnectionlogList.class, i -> stub(new ReadConnectionlogListOutputBuilder().build())),
+                    new RpcHelper<>(ReadMaintenanceList.class, i -> stub(new ReadMaintenanceListOutputBuilder().build())),
+                    new RpcHelper<>(ReadMediatorServerList.class, i -> stub(new ReadMediatorServerListOutputBuilder().build())),
+                    new RpcHelper<>(ReadPmdata15mList.class, i -> stub(new ReadPmdata15mListOutputBuilder().build())),
+                    new RpcHelper<>(ReadPmdata15mLtpList.class, i -> stub(new ReadPmdata15mLtpListOutputBuilder().build())),
+                    new RpcHelper<>(ReadPmdata15mDeviceList.class, i -> stub(new ReadPmdata15mDeviceListOutputBuilder().build())),
+                    new RpcHelper<>(ReadPmdata24hList.class, i -> stub(new ReadPmdata24hListOutputBuilder().build())),
+                    new RpcHelper<>(ReadPmdata24hLtpList.class, i -> stub(new ReadPmdata24hLtpListOutputBuilder().build())),
+                    new RpcHelper<>(ReadPmdata24hDeviceList.class, i -> stub(new ReadPmdata24hDeviceListOutputBuilder().build())),
+                    new RpcHelper<>(ReadGuiCutThroughEntry.class, i -> stub(new ReadGuiCutThroughEntryOutputBuilder().build())),
+                    new RpcHelper<>(ReadTlsKeyEntry.class, i -> stub(new ReadTlsKeyEntryOutputBuilder().build()))
                 )
             );
 
@@ -127,7 +124,7 @@ public class LightyDataProvider extends AbstractLightyModule {
         return true;
     }
 
-    private <O> ListenableFuture<@NonNull RpcResult<@NonNull O>> stubList(O output) {
+    private <O> ListenableFuture<@NonNull RpcResult<@NonNull O>> stub(O output) {
         return Futures.immediateFuture(RpcResultBuilder.success(output).build());
     }
 
@@ -156,15 +153,20 @@ public class LightyDataProvider extends AbstractLightyModule {
 
             ReadStatusOutput output = new ReadStatusOutputBuilder()
                 .setData(List.of(new DataBuilder()
-                    .setFaults(new FaultsBuilder().setCriticals(Uint32.valueOf(0)).setMajors(Uint32.valueOf(0)).setMinors(Uint32.valueOf(0)).setWarnings(Uint32.valueOf(0)).build())
+                    .setFaults(new FaultsBuilder()
+                        .setCriticals(Uint32.valueOf(0))
+                        .setMajors(Uint32.valueOf(0))
+                        .setMinors(Uint32.valueOf(0))
+                        .setWarnings(Uint32.valueOf(0))
+                        .build())
                     .setNetworkElementConnections(new NetworkElementConnectionsBuilder()
                         .setTotal(Uint32.valueOf(total))
                         .setConnected(Uint32.valueOf(connected))
                         .setConnecting(Uint32.valueOf(connecting))
                         .setUnableToConnect(Uint32.valueOf(unable))
                         .setDisconnected(Uint32.valueOf(disconnected))
-                        .setMounted(Uint32.valueOf(0))
-                        .setUnmounted(Uint32.valueOf(0))
+                        .setMounted(Uint32.valueOf(connected))
+                        .setUnmounted(Uint32.valueOf(total - connected))
                         .setUndefined(Uint32.valueOf(0))
                         .build())
                     .build()))
@@ -172,13 +174,16 @@ public class LightyDataProvider extends AbstractLightyModule {
             return Futures.immediateFuture(RpcResultBuilder.success(output).build());
         } catch (Exception e) {
             LOG.error("Error processing readStatus", e);
-            return Futures.immediateFuture(RpcResultBuilder.<ReadStatusOutput>failed().withError(ErrorType.APPLICATION, e.getMessage()).build());
+            return Futures.immediateFuture(RpcResultBuilder.<ReadStatusOutput>failed()
+                .withError(ErrorType.APPLICATION, e.getMessage()).build());
         }
     }
 
-    private ListenableFuture<@NonNull RpcResult<@NonNull ReadNetworkElementConnectionListOutput>> readNetworkElementConnectionList(final ReadNetworkElementConnectionListInput input) {
+    private ListenableFuture<@NonNull RpcResult<@NonNull ReadNetworkElementConnectionListOutput>> readNetworkElementConnectionList(
+            final ReadNetworkElementConnectionListInput input) {
         try {
-            List<org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.provider.rev201110.read.network.element.connection.list.output.Data> dataList = new ArrayList<>();
+            List<org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.provider.rev201110
+                .read.network.element.connection.list.output.Data> dataList = new ArrayList<>();
             
             try (ReadTransaction tx = lightyServices.getBindingDataBroker().newReadOnlyTransaction()) {
                 Optional<Topology> optTopo = tx.read(LogicalDatastoreType.OPERATIONAL, NETCONF_TOPOLOGY_IID.toIdentifier()).get();
@@ -199,12 +204,13 @@ public class LightyDataProvider extends AbstractLightyModule {
                             if (netconfNode.getConnectionStatus() != null) status = netconfNode.getConnectionStatus().getName();
                         }
 
-                        dataList.add(new org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.provider.rev201110.read.network.element.connection.list.output.DataBuilder()
+                        dataList.add(new org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.provider.rev201110
+                            .read.network.element.connection.list.output.DataBuilder()
                             .setId(nodeId)
                             .setNodeId(nodeId)
                             .setHost(host)
                             .setPort(Uint32.valueOf(port))
-                            .setStatus(org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.provider.rev201110.ConnectionLogStatus.forName(status))
+                            .setStatus(ConnectionLogStatus.forName(status))
                             .build());
                     }
                 }
@@ -212,16 +218,17 @@ public class LightyDataProvider extends AbstractLightyModule {
 
             long totalElements = dataList.size();
             long page = 1;
-            long size = totalElements > 0 ? totalElements : 1;
+            long size = Math.max(totalElements, 20);
             
             if (input != null && input.getPagination() != null) {
-                 if (input.getPagination().getPage() != null) page = input.getPagination().getPage().longValue();
-                 if (input.getPagination().getSize() != null) size = input.getPagination().getSize().longValue();
+                if (input.getPagination().getPage() != null) page = input.getPagination().getPage().longValue();
+                if (input.getPagination().getSize() != null) size = input.getPagination().getSize().longValue();
             }
 
             ReadNetworkElementConnectionListOutput output = new ReadNetworkElementConnectionListOutputBuilder()
                 .setData(dataList)
-                .setPagination(new PaginationBuilder()
+                .setPagination(new org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.provider.rev201110
+                    .read.network.element.connection.list.output.PaginationBuilder()
                     .setPage(Uint64.valueOf(page))
                     .setSize(Uint32.valueOf(size))
                     .setTotal(Uint64.valueOf(totalElements))
@@ -230,27 +237,115 @@ public class LightyDataProvider extends AbstractLightyModule {
             return Futures.immediateFuture(RpcResultBuilder.success(output).build());
         } catch (Exception e) {
             LOG.error("Error processing readNetworkElementConnectionList", e);
-            return Futures.immediateFuture(RpcResultBuilder.<ReadNetworkElementConnectionListOutput>failed().withError(ErrorType.APPLICATION, e.getMessage()).build());
+            return Futures.immediateFuture(RpcResultBuilder.<ReadNetworkElementConnectionListOutput>failed()
+                .withError(ErrorType.APPLICATION, e.getMessage()).build());
         }
     }
 
-    private ListenableFuture<@NonNull RpcResult<@NonNull CreateNetworkElementConnectionOutput>> createNetworkElementConnection(final CreateNetworkElementConnectionInput input) {
+    private ListenableFuture<@NonNull RpcResult<@NonNull ReadInventoryListOutput>> readInventoryList(
+            final ReadInventoryListInput input) {
+        try {
+            List<org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.provider.rev201110
+                .read.inventory.list.output.Data> dataList = new ArrayList<>();
+            
+            try (ReadTransaction tx = lightyServices.getBindingDataBroker().newReadOnlyTransaction()) {
+                Optional<Topology> optTopo = tx.read(LogicalDatastoreType.OPERATIONAL, NETCONF_TOPOLOGY_IID.toIdentifier()).get();
+                if (optTopo.isPresent() && optTopo.get().getNode() != null) {
+                    for (Node node : optTopo.get().getNode().values()) {
+                        String nodeId = node.getNodeId().getValue();
+                        if (nodeId.equals("controller-config")) continue;
+
+                        NetconfNodeAugment augment = node.augmentation(NetconfNodeAugment.class);
+                        if (augment != null && augment.getNetconfNode() != null) {
+                            NetconfNode netconfNode = augment.getNetconfNode();
+                            
+                            // Include connected devices in inventory
+                            if (netconfNode.getConnectionStatus() == ConnectionStatus.Connected) {
+                                dataList.add(new org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.provider.rev201110
+                                    .read.inventory.list.output.DataBuilder()
+                                    .setId(nodeId + "/chassis")
+                                    .setNodeId(nodeId)
+                                    .setTreeLevel(Uint32.valueOf(0))
+                                    .setUuid(nodeId)
+                                    .setDescription("NETCONF Device: " + nodeId)
+                                    .setManufacturerIdentifier("Unknown")
+                                    .setSerial("Unknown")
+                                    .setVersion("1.0")
+                                    .setDate("Unknown")
+                                    .setPartTypeId("chassis")
+                                    .setModelIdentifier("NETCONF-Device")
+                                    .setTypeName("chassis")
+                                    .build());
+                            }
+                        }
+                    }
+                }
+            }
+
+            long totalElements = dataList.size();
+            long page = 1;
+            long size = Math.max(totalElements, 20);
+            
+            if (input != null && input.getPagination() != null) {
+                if (input.getPagination().getPage() != null) page = input.getPagination().getPage().longValue();
+                if (input.getPagination().getSize() != null) size = input.getPagination().getSize().longValue();
+            }
+
+            ReadInventoryListOutput output = new ReadInventoryListOutputBuilder()
+                .setData(dataList)
+                .setPagination(new org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.provider.rev201110
+                    .read.inventory.list.output.PaginationBuilder()
+                    .setPage(Uint64.valueOf(page))
+                    .setSize(Uint32.valueOf(size))
+                    .setTotal(Uint64.valueOf(totalElements))
+                    .build())
+                .build();
+            return Futures.immediateFuture(RpcResultBuilder.success(output).build());
+        } catch (Exception e) {
+            LOG.error("Error processing readInventoryList", e);
+            return Futures.immediateFuture(RpcResultBuilder.<ReadInventoryListOutput>failed()
+                .withError(ErrorType.APPLICATION, e.getMessage()).build());
+        }
+    }
+
+    private ListenableFuture<@NonNull RpcResult<@NonNull ReadFaultcurrentListOutput>> readFaultcurrentList(
+            final ReadFaultcurrentListInput input) {
+        // Return empty fault list with proper pagination
+        ReadFaultcurrentListOutput output = new ReadFaultcurrentListOutputBuilder()
+            .setPagination(new org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.data.provider.rev201110
+                .read.faultcurrent.list.output.PaginationBuilder()
+                .setPage(Uint64.valueOf(1))
+                .setSize(Uint32.valueOf(20))
+                .setTotal(Uint64.valueOf(0))
+                .build())
+            .build();
+        return Futures.immediateFuture(RpcResultBuilder.success(output).build());
+    }
+
+    private ListenableFuture<@NonNull RpcResult<@NonNull CreateNetworkElementConnectionOutput>> createNetworkElementConnection(
+            final CreateNetworkElementConnectionInput input) {
         return Futures.transform(
-            writeMountPoint(input.getNodeId(), input.getHost(), input.getPort() != null ? input.getPort().intValue() : 830, input.getUsername(), input.getPassword(), false),
+            writeMountPoint(input.getNodeId(), input.getHost(), 
+                input.getPort() != null ? input.getPort().intValue() : 830, 
+                input.getUsername(), input.getPassword(), false),
             v -> RpcResultBuilder.success(new CreateNetworkElementConnectionOutputBuilder().build()).build(),
             com.google.common.util.concurrent.MoreExecutors.directExecutor()
         );
     }
 
-    private ListenableFuture<@NonNull RpcResult<@NonNull UpdateNetworkElementConnectionOutput>> updateNetworkElementConnection(final UpdateNetworkElementConnectionInput input) {
+    private ListenableFuture<@NonNull RpcResult<@NonNull UpdateNetworkElementConnectionOutput>> updateNetworkElementConnection(
+            final UpdateNetworkElementConnectionInput input) {
         return Futures.transform(
-            writeMountPoint(input.getNodeId(), input.getHost(), input.getPort() != null ? input.getPort().intValue() : 830, input.getUsername(), input.getPassword(), true),
+            writeMountPoint(input.getNodeId(), input.getHost(), 
+                input.getPort() != null ? input.getPort().intValue() : 830, 
+                input.getUsername(), input.getPassword(), true),
             v -> RpcResultBuilder.success(new UpdateNetworkElementConnectionOutputBuilder().build()).build(),
             com.google.common.util.concurrent.MoreExecutors.directExecutor()
         );
     }
 
-    private ListenableFuture<Void> writeMountPoint(String nodeId, String host, int port, String username, String password, boolean isUpdate) {
+    private ListenableFuture<Void> writeMountPoint(String nodeId, String host, int port, 
+            String username, String password, boolean isUpdate) {
         try {
             NodeId domNodeId = new NodeId(nodeId);
             InstanceIdentifier<Node> nodeIid = NETCONF_TOPOLOGY_IID.child(Node.class, new NodeKey(domNodeId));
@@ -275,7 +370,8 @@ public class LightyDataProvider extends AbstractLightyModule {
             Node node = new NodeBuilder()
                 .withKey(new NodeKey(domNodeId))
                 .setNodeId(domNodeId)
-                .addAugmentation(new NetconfNodeAugmentBuilder().setNetconfNode(netconfNodeBuilder.build()).build())
+                .addAugmentation(new NetconfNodeAugmentBuilder()
+                    .setNetconfNode(netconfNodeBuilder.build()).build())
                 .build();
 
             WriteTransaction tx = lightyServices.getBindingDataBroker().newWriteOnlyTransaction();
@@ -284,14 +380,16 @@ public class LightyDataProvider extends AbstractLightyModule {
             } else {
                 tx.put(LogicalDatastoreType.CONFIGURATION, nodeIid.toIdentifier(), node);
             }
-            return tx.commit().transform(commitInfo -> null, com.google.common.util.concurrent.MoreExecutors.directExecutor());
+            return tx.commit().transform(commitInfo -> null, 
+                com.google.common.util.concurrent.MoreExecutors.directExecutor());
         } catch (Exception e) {
             LOG.error("Failed to write mountpoint", e);
             return Futures.immediateFailedFuture(e);
         }
     }
 
-    private ListenableFuture<@NonNull RpcResult<@NonNull DeleteNetworkElementConnectionOutput>> deleteNetworkElementConnection(final DeleteNetworkElementConnectionInput input) {
+    private ListenableFuture<@NonNull RpcResult<@NonNull DeleteNetworkElementConnectionOutput>> deleteNetworkElementConnection(
+            final DeleteNetworkElementConnectionInput input) {
         try {
             NodeId domNodeId = new NodeId(input.getNodeId());
             InstanceIdentifier<Node> nodeIid = NETCONF_TOPOLOGY_IID.child(Node.class, new NodeKey(domNodeId));
@@ -306,7 +404,8 @@ public class LightyDataProvider extends AbstractLightyModule {
             );
         } catch (Exception e) {
             LOG.error("Failed to delete mountpoint", e);
-            return Futures.immediateFuture(RpcResultBuilder.<DeleteNetworkElementConnectionOutput>failed().withError(ErrorType.APPLICATION, e.getMessage()).build());
+            return Futures.immediateFuture(RpcResultBuilder.<DeleteNetworkElementConnectionOutput>failed()
+                .withError(ErrorType.APPLICATION, e.getMessage()).build());
         }
     }
 }
